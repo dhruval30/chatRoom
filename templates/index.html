@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #f0f2f5;
+        }
+        h1, h2, h3 {
+            color: #1877f2;
+        }
+        #messages {
+            border: 1px solid #dddfe2;
+            border-radius: 8px;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+            background-color: white;
+        }
+        input[type="text"], button {
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #dddfe2;
+            border-radius: 6px;
+        }
+        input[type="text"] {
+            width: calc(100% - 18px);
+        }
+        button {
+            background-color: #1877f2;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #166fe5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat Room</h1>
+    <div id="nameSection">
+        <h2>Enter Your Name</h2>
+        <input type="text" id="nameInput" placeholder="Your Name">
+        <button id="setNameButton">Set Name</button>
+    </div>
+
+    <div id="roleSection" style="display: none;">
+        <h2>Select your role:</h2>
+        <button id="hostButton">Host</button>
+        <button id="guestButton">Guest</button>
+    </div>
+
+    <div id="hostSection" style="display: none;">
+        <h3>Create Room</h3>
+        <button id="createRoomButton">Create Room</button>
+        <p id="hostMessage"></p>
+    </div>
+
+    <div id="guestSection" style="display: none;">
+        <h3>Join Room</h3>
+        <input type="text" id="roomKeyInput" placeholder="Enter Room Key">
+        <button id="joinRoomButton">Join Room</button>
+        <p id="guestMessage"></p>
+    </div>
+
+    <script>
+        const socket = io();
+        let userName = '';
+
+        document.getElementById('setNameButton').onclick = () => {
+            userName = document.getElementById('nameInput').value.trim();
+            if (userName) {
+                document.getElementById('nameSection').style.display = 'none';
+                document.getElementById('roleSection').style.display = 'block';
+            } else {
+                alert('Please enter a valid name.');
+            }
+        };
+
+        document.getElementById('hostButton').onclick = () => {
+            document.getElementById('hostSection').style.display = 'block';
+            document.getElementById('guestSection').style.display = 'none';
+        };
+
+        document.getElementById('guestButton').onclick = () => {
+            document.getElementById('guestSection').style.display = 'block';
+            document.getElementById('hostSection').style.display = 'none';
+        };
+
+        document.getElementById('createRoomButton').onclick = async () => {
+            try {
+                const response = await fetch('/create_room', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_name: userName })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    window.location.href = `/chatroom/${data.room_key}?name=${encodeURIComponent(userName)}`;
+                } else {
+                    document.getElementById('hostMessage').textContent = data.message;
+                }
+            } catch (error) {
+                console.error('Error creating room:', error);
+                document.getElementById('hostMessage').textContent = 'Error creating room. Please try again.';
+            }
+        };
+
+        document.getElementById('joinRoomButton').onclick = async () => {
+            const roomKey = document.getElementById('roomKeyInput').value;
+            try {
+                const response = await fetch('/join_room', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ room_key: roomKey, user_name: userName })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    window.location.href = `/chatroom/${data.room_key}?name=${encodeURIComponent(userName)}`;
+                } else {
+                    document.getElementById('guestMessage').textContent = data.message;
+                }
+            } catch (error) {
+                console.error('Error joining room:', error);
+                document.getElementById('guestMessage').textContent = 'Error joining room. Please try again.';
+            }
+        };
+    </script>
+</body>
+</html>

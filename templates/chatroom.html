@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #f0f2f5;
+        }
+        h1, h2 {
+            color: #1877f2;
+        }
+        #chatContainer {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #messages {
+            height: 400px;
+            overflow-y: scroll;
+            padding: 10px;
+            border: 1px solid #dddfe2;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 18px;
+            max-width: 70%;
+        }
+        .message.sent {
+            background-color: #0084ff;
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        .message.received {
+            background-color: #e4e6eb;
+            color: black;
+        }
+        .message .sender {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        #messageInput {
+            width: calc(100% - 110px);
+            padding: 10px;
+            border: 1px solid #dddfe2;
+            border-radius: 20px;
+        }
+        #sendMessageButton {
+            padding: 10px 20px;
+            background-color: #1877f2;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        #sendMessageButton:hover {
+            background-color: #166fe5;
+        }
+        #participantCount {
+            margin-top: 10px;
+            font-style: italic;
+            color: #65676b;
+        }
+    </style>
+</head>
+<body>
+    <div id="chatContainer">
+        <h1>Chat Room</h1>
+        <h2>Room Key: <span id="roomKey"></span></h2>
+        <div id="participantCount">Participants: <span id="count">1</span></div>
+        <div id="messages"></div>
+        <input type="text" id="messageInput" placeholder="Type your message">
+        <button id="sendMessageButton">Send</button>
+    </div>
+
+    <script>
+        const socket = io();
+        const roomKey = window.location.pathname.split('/').pop();
+        const userName = new URLSearchParams(window.location.search).get('name');
+        document.getElementById('roomKey').textContent = roomKey;
+
+        socket.on('connect', () => {
+            socket.emit('join', { room: roomKey, user_name: userName });
+        });
+
+        socket.on('receive_message', (data) => {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${data.user_name === userName ? 'sent' : 'received'}`;
+            messageElement.innerHTML = `
+                <div class="sender">${data.user_name}</div>
+                <div class="content">${data.message}</div>
+            `;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        socket.on('update_participant_count', (data) => {
+            document.getElementById('count').textContent = data.count;
+        });
+
+        document.getElementById('sendMessageButton').onclick = sendMessage;
+
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const message = document.getElementById('messageInput').value;
+            if (message.trim() !== '') {
+                socket.emit('send_message', { room_key: roomKey, message: message, user_name: userName });
+                document.getElementById('messageInput').value = '';
+            }
+        }
+
+        // Fetch existing messages when joining the room
+        fetch('/get_messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_key: roomKey })
+        })
+        .then(response => response.json())
+        .then(data => {
+            const messagesDiv = document.getElementById('messages');
+            data.messages.forEach(msg => {
+                const messageElement = document.createElement('div');
+                messageElement.className = `message ${msg.user_name === userName ? 'sent' : 'received'}`;
+                messageElement.innerHTML = `
+                    <div class="sender">${msg.user_name}</div>
+                    <div class="content">${msg.message}</div>
+                `;
+                messagesDiv.appendChild(messageElement);
+            });
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        })
+        .catch(error => console.error('Error fetching messages:', error));
+    </script>
+</body>
+</html>
